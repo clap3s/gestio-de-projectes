@@ -1,8 +1,0 @@
-PROMPT 1 — EXPLORAR
-Actúa como analista de datos urbanos. Tengo un extracto del padrón municipal de habitantes de Barcelona con población por distrito para 2019 y 2024. Describe las columnas, comprueba filas y valores y propone 3 preguntas que pueda responder un dashboard.
-
-PROMPT 2 — GENERAR
-Crea un dashboard web en un único archivo HTML, en español, usando HTML + CSS + JavaScript y Chart.js. Debe incluir 4 KPI, gráfico comparativo 2019/2024, gráfico de variación porcentual, filtro por distrito, tabla de detalle, diseño responsive y una página sobre.html con fuente, método y limitaciones. Lee el CSV local con JavaScript.
-
-PROMPT 3 — REVISAR
-Revisa el dashboard y comprueba que los totales, las variaciones porcentuales, el filtro y los gráficos coinciden con el CSV. Corrige cualquier error sin cambiar los datos.
