@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Población de Barcelona 2019–2024</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f1e8;--card:#fffdf8;--ink:#342a20;--muted:#75695d;--accent:#9a6a32;--accent2:#c69b62;--line:#e4d8c7}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{background:linear-gradient(135deg,#5a3c22,#9a6a32);color:white;padding:34px 22px}
+.wrap{max-width:1180px;margin:auto} h1{margin:0 0 8px;font-size:clamp(28px,4vw,46px)} header p{margin:0;opacity:.9}
+nav{background:#fffaf2;border-bottom:1px solid var(--line);padding:10px 22px} nav a{color:var(--ink);text-decoration:none;margin-right:20px;font-weight:700}
+main{padding:26px 22px 42px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 4px 14px #00000008}
+.kpi-label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.kpi{font-size:30px;font-weight:800;margin-top:7px}.small{font-size:13px;color:var(--muted);margin-top:5px}
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}.controls select{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink)}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}.chart-card{min-height:420px}.chart-wrap{position:relative;height:350px}
+.insight{border-left:5px solid var(--accent);padding:14px 16px;background:#f7efe3;border-radius:10px;margin-top:18px}
+table{width:100%;border-collapse:collapse} th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left;font-size:14px} th{color:var(--muted)}
+footer{padding:20px 22px;background:#2f261e;color:#eee;font-size:13px} footer a{color:#f0c98e}
+@media(max-width:850px){.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.chart-card{min-height:380px}}
+@media(max-width:520px){.kpis{grid-template-columns:1fr}main{padding:18px 14px}header{padding:28px 16px}.chart-wrap{height:300px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<h1>Población de Barcelona</h1>
+<p>Evolución territorial por distrito · 2019–2024</p>
+</div></header>
+<nav><div class="wrap"><a href="index.html">Dashboard</a><a href="sobre.html">Sobre los datos</a></div></nav>
+<main class="wrap">
+<section class="card" style="margin-bottom:18px">
+<strong>Cómo usarlo:</strong> abre esta página, pulsa <em>Seleccionar archivo</em> y elige
+<strong>data/poblacion_distritos_bcn_2019_2024.csv</strong>. Después aparecerán los KPI, gráficos y tabla.
+</section>
+<section class="kpis">
+<div class="card"><div class="kpi-label">Población 2019</div><div class="kpi" id="k2019">—</div><div class="small">10 distritos</div></div>
+<div class="card"><div class="kpi-label">Población 2024</div><div class="kpi" id="k2024">—</div><div class="small">10 distritos</div></div>
+<div class="card"><div class="kpi-label">Cambio 2019–2024</div><div class="kpi" id="kgrowth">—</div><div class="small">variación total</div></div>
+<div class="card"><div class="kpi-label">Distrito más poblado</div><div class="kpi" id="ktop">—</div><div class="small" id="ktopval">—</div></div>
+</section>
+
+<section class="card controls">
+<label for="csvFile"><strong>1. Cargar datos:</strong></label>
+<input id="csvFile" type="file" accept=".csv,text/csv">
+<span id="fileStatus" class="small">Selecciona el archivo CSV incluido en la carpeta <b>data</b>.</span>
+<label for="district"><strong>2. Filtrar distrito:</strong></label>
+<select id="district" disabled><option value="all">Todos los distritos</option></select>
+<button id="reset" type="button" disabled>Restablecer</button>
+</section>
+
+<section class="grid">
+<div class="card chart-card"><h2>Población por distrito</h2><div class="chart-wrap"><canvas id="barChart"></canvas></div></div>
+<div class="card chart-card"><h2>Evolución 2019 → 2024</h2><div class="chart-wrap"><canvas id="changeChart"></canvas></div></div>
+</section>
+
+<section class="card" style="margin-top:18px"><h2>Detalle</h2><div style="overflow:auto"><table>
+<thead><tr><th>Distrito</th><th>2019</th><th>2024</th><th>Cambio</th><th>%</th></tr></thead>
+<tbody id="tbody"></tbody></table></div>
+<div class="insight"><strong>Pregunta guía:</strong> ¿Qué patrón o desigualdad territorial revela el dashboard?
+<br>La distribución de población no es homogénea: algunos distritos concentran una parte importante de la población y el crecimiento 2019–2024 también presenta diferencias entre territorios.</div>
+</section>
+</main>
+<footer><div class="wrap">
+Fuente: Ajuntament de Barcelona · Open Data BCN, padrón municipal de habitantes (pad_mdbas). 
+Datos 2019 y 2024. Elaboración del dashboard: HTML, CSS y JavaScript con Chart.js.
+<br>Los valores incluidos son un extracto por distrito preparado para esta práctica a partir de los datos de Open Data BCN.
+</div></footer>
+
+<script>
+let DATA=[];
+const fmt=n=>new Intl.NumberFormat('es-ES').format(n);
+const pct=n=>`${n>=0?'+':''}${n.toFixed(2)} %`;
+
+let barChart, changeChart;
+
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/);
+  if(lines.length < 2) throw new Error("El CSV no contiene suficientes filas.");
+  const sep = lines[0].includes(";") ? ";" : ",";
+  const rows = lines.slice(1).map(line => {
+    const parts = line.split(sep).map(x => x.trim().replace(/^"|"$/g,""));
+    return parts;
+  }).filter(r => r.length >= 4 && r[1]);
+  return rows.map(r => ({
+    code:r[0],
+    name:r[1],
+    p19:Number(String(r[2]).replace(/\./g,"").replace(",", ".")),
+    p24:Number(String(r[3]).replace(/\./g,"").replace(",", "."))
+  })).filter(d => Number.isFinite(d.p19) && Number.isFinite(d.p24));
+}
+
+function loadDataFromText(text, filename){
+  try{
+    DATA = parseCSV(text);
+    if(!DATA.length) throw new Error("No se han encontrado datos válidos.");
+    const sel=document.getElementById('district');
+    sel.innerHTML='<option value="all">Todos los distritos</option>';
+    DATA.forEach(d=>{
+      const o=document.createElement('option');
+      o.value=d.code;
+      o.textContent=d.name;
+      sel.appendChild(o);
+    });
+    sel.disabled=false;
+    document.getElementById('reset').disabled=false;
+    document.getElementById('fileStatus').innerHTML =
+      `✓ <b>${filename}</b> cargado correctamente: ${DATA.length} distritos.`;
+    render();
+  }catch(e){
+    document.getElementById('fileStatus').textContent =
+      "Error al leer el CSV: " + e.message;
+    console.error(e);
+  }
+}
+
+document.getElementById('csvFile').addEventListener('change', e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>loadDataFromText(reader.result,file.name);
+  reader.onerror=()=>document.getElementById('fileStatus').textContent="No se pudo leer el archivo.";
+  reader.readAsText(file,'UTF-8');
+});
+
+function render(){
+  const code=document.getElementById('district').value;
+  const rows=code==='all'?DATA:DATA.filter(d=>d.code===code);
+  const total19=rows.reduce((s,d)=>s+d.p19,0), total24=rows.reduce((s,d)=>s+d.p24,0);
+  const growth=(total24-total19)/total19*100;
+  const top=[...rows].sort((a,b)=>b.p24-a.p24)[0];
+  document.getElementById('k2019').textContent=fmt(total19);
+  document.getElementById('k2024').textContent=fmt(total24);
+  document.getElementById('kgrowth').textContent=pct(growth);
+  document.getElementById('ktop').textContent=top?.name||'—';
+  document.getElementById('ktopval').textContent=top?`${fmt(top.p24)} habitantes en 2024`:'—';
+
+  const labels=rows.map(d=>d.name);
+  const p19=rows.map(d=>d.p19), p24=rows.map(d=>d.p24);
+  if(barChart)barChart.destroy();
+  barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels,datasets:[
+    {label:'2019',data:p19,backgroundColor:'#c69b62'},
+    {label:'2024',data:p24,backgroundColor:'#7b5129'}
+  ]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{position:'bottom'}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}});
+
+  const changes=rows.map(d=>(d.p24-d.p19)/d.p19*100);
+  if(changeChart)changeChart.destroy();
+  changeChart=new Chart(document.getElementById('changeChart'),{type:'bar',data:{labels,datasets:[
+    {label:'Variación %',data:changes,backgroundColor:'#9a6a32'}
+  ]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>v+' %'}}}}});
+
+  document.getElementById('tbody').innerHTML=rows.map(d=>{
+    const diff=d.p24-d.p19, g=diff/d.p19*100;
+    return `<tr><td>${d.name}</td><td>${fmt(d.p19)}</td><td>${fmt(d.p24)}</td><td>${diff>=0?'+':''}${fmt(diff)}</td><td>${pct(g)}</td></tr>`;
+  }).join('');
+}
+document.getElementById('district').addEventListener('change',render);
+document.getElementById('reset').addEventListener('click',()=>{document.getElementById('district').value='all';render()});
+</script>
+</body></html>

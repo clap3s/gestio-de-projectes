@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sobre los datos · Población de Barcelona</title>
+<style>
+body{margin:0;background:#f5f1e8;color:#342a20;font-family:system-ui,Arial}.wrap{max-width:900px;margin:auto;padding:28px 20px}
+header{background:#5a3c22;color:#fff}.card{background:#fffdf8;border:1px solid #e4d8c7;border-radius:16px;padding:22px;margin:18px 0}
+a{color:#7b5129;font-weight:700}h1{margin:0}.note{background:#f7efe3;padding:14px;border-left:4px solid #9a6a32}
+</style></head><body><header><div class="wrap"><h1>Sobre los datos</h1><p>Metodología y fuentes</p></div></header>
+<div class="wrap"><p><a href="index.html">← Volver al dashboard</a></p>
+<div class="card"><h2>Objetivo</h2><p>Analizar cómo se distribuye la población de Barcelona entre sus 10 distritos y cómo cambia entre 2019 y 2024.</p></div>
+<div class="card"><h2>Fuente</h2><p>Ajuntament de Barcelona, <strong>Open Data BCN</strong>, conjunto de datos «Padró municipal d'habitants (pad_mdbas)».</p>
+<p>El trabajo utiliza los valores de población distrital de 2019 y 2024 publicados en Open Data BCN y documentados en una consulta reproducible del dataset.</p></div>
+<div class="card"><h2>Datos incluidos</h2><ul><li>CODI_DISTRICTE</li><li>NOM_DISTRICTE</li><li>POBLACION_2019</li><li>POBLACION_2024</li></ul>
+<p>El CSV entregado es un extracto agregado a nivel de distrito, preparado específicamente para el dashboard.</p></div>
+<div class="card"><h2>Método</h2><ol><li>Seleccionar los 10 distritos de Barcelona.</li><li>Comparar población de 2019 y 2024.</li><li>Calcular diferencia absoluta y variación porcentual.</li><li>Representar los resultados con gráficos de barras y filtro por distrito.</li></ol></div>
+<div class="card"><h2>Limitaciones</h2><p>El dashboard trabaja a escala de distrito, por lo que no permite observar desigualdades dentro de cada distrito. La variación se interpreta como cambio de población registrada entre los dos años, no como explicación causal.</p></div>
+<div class="card note"><strong>Uso de IA:</strong> la estructura, el código y la iteración del dashboard se han realizado con asistencia de IA. Los datos y los cálculos se han comprobado antes de la entrega.</div>
+</div></body></html>
