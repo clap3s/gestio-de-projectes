@@ -15,9 +15,6 @@
   header{background:var(--dark);color:#fff;padding:18px 24px}
   header h1{margin:0;font-size:22px;font-weight:600}
   header p{margin:4px 0 0;color:#cfc6b4;font-size:13px}
-  header nav{margin-top:10px}
-  header nav a{color:#e6cf93;text-decoration:none;font-size:14px;margin-right:18px}
-  header nav a:hover{text-decoration:underline}
   main{max-width:1300px;margin:0 auto;padding:18px 24px 32px}
   .bar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin-bottom:16px}
   .bar label{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:8px}
@@ -52,8 +49,7 @@
 <body class="empty">
 <header>
   <h1>Viviendas de uso turístico (HUT) en Barcelona</h1>
-  <p>Dashboard de ejemplo · Práctica «Dashboarding con datos abiertos e IA» · Gestión de Proyectos (UAB)</p>
-  <nav><a href="index.html">Dashboard</a><a href="sobre.html">Sobre los datos y el método</a></nav>
+  <p>Registro municipal de viviendas de uso turístico por barrio y distrito</p>
 </header>
 
 <main>
@@ -94,7 +90,7 @@
   </div>
 </main>
 
-<footer>Fuente: Open Data BCN (Ajuntament de Barcelona), CC BY 4.0 · Límites de barrio: martgnz/bcn-geodata · Mapa base: OpenFreeMap © OpenMapTiles, datos © OpenStreetMap · Elaboración: Prof. Dario Cottafava (UAB), con asistencia de IA · <a href="sobre.html" style="color:#a8812f">Más información</a></footer>
+<footer>Fuente: Open Data BCN (Ajuntament de Barcelona), CC BY 4.0 · Límites de barrio: martgnz/bcn-geodata · Mapa base: OpenFreeMap © OpenMapTiles, datos © OpenStreetMap</footer>
 
 <script>
 const GEOJSON_URL = "https://raw.githubusercontent.com/martgnz/bcn-geodata/master/barris/barris.geojson";
@@ -112,22 +108,9 @@ let geo, rows = [], barris = {}, dists = {};
 let state = {dist:"ALL", metric:"n", points:false};
 let map, chTop, chDist;
 
-// 1. Cargar el GeoJSON de barrios (primero la copia local en data/, si no desde GitHub)
-//    y, si la página está en un servidor web, también el CSV de data/ automáticamente
-const CSV_LOCAL = "data/hut_comunicacio_opendata.csv", GEOJSON_LOCAL = "data/barris.geojson";
-async function getJSON(urls){ for (const u of urls){ try { const r = await fetch(u); if (r.ok) return await r.json(); } catch(e){} } throw new Error("geo"); }
-getJSON([GEOJSON_LOCAL, GEOJSON_URL]).then(async g => {
-  geo = g; buildMap(); buildCharts();
-  try {
-    const r = await fetch(CSV_LOCAL); if (!r.ok) return;
-    const data = Papa.parse(await r.text(), {header:true, skipEmptyLines:true, transformHeader:h => h.replace(/^\uFEFF/, "").trim()}).data;
-    if (data.length && "CODI_BARRI" in data[0]){
-      prepare(data); update(); document.body.classList.remove("empty");
-      document.querySelector(".bar .file").style.display = "none";
-      msg(`Datos cargados automáticamente: ${fmt(rows.length)} viviendas (Open Data BCN).`);
-    }
-  } catch(e){ /* abierto con doble clic: el usuario elige el CSV con el botón */ }
-}).catch(() => msg("No se ha podido descargar el GeoJSON de barrios. Comprueba la conexión a internet."));
+// 1. Cargar el GeoJSON de barrios al abrir la página
+fetch(GEOJSON_URL).then(r => r.json()).then(g => { geo = g; buildMap(); buildCharts(); })
+  .catch(() => msg("No se ha podido descargar el GeoJSON de barrios. Comprueba la conexión a internet."));
 
 // 2. Leer el CSV elegido por el usuario
 document.getElementById("csvInput").addEventListener("change", e => {

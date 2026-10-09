@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Viviendas de uso turístico en Barcelona</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
@@ -15,9 +15,6 @@
   header{background:var(--dark);color:#fff;padding:18px 24px}
   header h1{margin:0;font-size:22px;font-weight:600}
   header p{margin:4px 0 0;color:#cfc6b4;font-size:13px}
-  header nav{margin-top:10px}
-  header nav a{color:#e6cf93;text-decoration:none;font-size:14px;margin-right:18px}
-  header nav a:hover{text-decoration:underline}
   main{max-width:1300px;margin:0 auto;padding:18px 24px 32px}
   .bar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin-bottom:16px}
   .bar label{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:8px}
@@ -35,13 +32,10 @@
   .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
   .card h2{font-size:15px;margin:0 0 10px;font-weight:600}
-  .mapwrap{position:relative}
   #map{height:540px;border-radius:8px}
   .right{display:grid;grid-template-rows:1fr 1fr;gap:14px}
   .chart{position:relative;height:230px}
-  .legend,.info{position:absolute;z-index:2;background:#fff;padding:8px 10px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.2);font-size:12px;line-height:18px}
-  .info{top:10px;right:10px}
-  .legend{bottom:34px;right:10px}
+  .legend,.info{background:#fff;padding:8px 10px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.2);font-size:12px;line-height:18px}
   .legend i{display:inline-block;width:14px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid #ccc}
   .info{font-size:13px;min-width:180px}
   footer{max-width:1300px;margin:0 auto;padding:0 24px 28px;font-size:12px;color:var(--ink2)}
@@ -52,8 +46,7 @@
 <body class="empty">
 <header>
   <h1>Viviendas de uso turístico (HUT) en Barcelona</h1>
-  <p>Dashboard de ejemplo · Práctica «Dashboarding con datos abiertos e IA» · Gestión de Proyectos (UAB)</p>
-  <nav><a href="index.html">Dashboard</a><a href="sobre.html">Sobre los datos y el método</a></nav>
+  <p>Registro municipal de viviendas de uso turístico por barrio y distrito</p>
 </header>
 
 <main>
@@ -85,7 +78,7 @@
     </div>
 
     <div class="grid">
-      <div class="card"><h2 id="mapTitle">Mapa por barrio</h2><div class="mapwrap"><div id="map"></div><div class="info" id="info">Pasa el ratón por un barrio</div><div class="legend" id="legend"></div></div></div>
+      <div class="card"><h2 id="mapTitle">Mapa por barrio</h2><div id="map"></div></div>
       <div class="right">
         <div class="card"><h2 id="topTitle">Top 10 de barrios</h2><div class="chart"><canvas id="cTop"></canvas></div></div>
         <div class="card"><h2 id="distTitle">Total por distrito</h2><div class="chart"><canvas id="cDist"></canvas></div></div>
@@ -94,7 +87,7 @@
   </div>
 </main>
 
-<footer>Fuente: Open Data BCN (Ajuntament de Barcelona), CC BY 4.0 · Límites de barrio: martgnz/bcn-geodata · Mapa base: OpenFreeMap © OpenMapTiles, datos © OpenStreetMap · Elaboración: Prof. Dario Cottafava (UAB), con asistencia de IA · <a href="sobre.html" style="color:#a8812f">Más información</a></footer>
+<footer>Fuente: Open Data BCN (Ajuntament de Barcelona), CC BY 4.0 · Límites de barrio: martgnz/bcn-geodata · Mapa base © OpenStreetMap, © CARTO</footer>
 
 <script>
 const GEOJSON_URL = "https://raw.githubusercontent.com/martgnz/bcn-geodata/master/barris/barris.geojson";
@@ -110,31 +103,18 @@ const pad2 = s => String(s ?? "").trim().padStart(2, "0");
 
 let geo, rows = [], barris = {}, dists = {};
 let state = {dist:"ALL", metric:"n", points:false};
-let map, chTop, chDist;
+let map, geoLayer, pointLayer, info, chTop, chDist;
 
-// 1. Cargar el GeoJSON de barrios (primero la copia local en data/, si no desde GitHub)
-//    y, si la página está en un servidor web, también el CSV de data/ automáticamente
-const CSV_LOCAL = "data/hut_comunicacio_opendata.csv", GEOJSON_LOCAL = "data/barris.geojson";
-async function getJSON(urls){ for (const u of urls){ try { const r = await fetch(u); if (r.ok) return await r.json(); } catch(e){} } throw new Error("geo"); }
-getJSON([GEOJSON_LOCAL, GEOJSON_URL]).then(async g => {
-  geo = g; buildMap(); buildCharts();
-  try {
-    const r = await fetch(CSV_LOCAL); if (!r.ok) return;
-    const data = Papa.parse(await r.text(), {header:true, skipEmptyLines:true, transformHeader:h => h.replace(/^\uFEFF/, "").trim()}).data;
-    if (data.length && "CODI_BARRI" in data[0]){
-      prepare(data); update(); document.body.classList.remove("empty");
-      document.querySelector(".bar .file").style.display = "none";
-      msg(`Datos cargados automáticamente: ${fmt(rows.length)} viviendas (Open Data BCN).`);
-    }
-  } catch(e){ /* abierto con doble clic: el usuario elige el CSV con el botón */ }
-}).catch(() => msg("No se ha podido descargar el GeoJSON de barrios. Comprueba la conexión a internet."));
+// 1. Cargar el GeoJSON de barrios al abrir la página
+fetch(GEOJSON_URL).then(r => r.json()).then(g => { geo = g; buildMap(); buildCharts(); })
+  .catch(() => msg("No se ha podido descargar el GeoJSON de barrios. Comprueba la conexión a internet."));
 
 // 2. Leer el CSV elegido por el usuario
 document.getElementById("csvInput").addEventListener("change", e => {
   const file = e.target.files[0]; if (!file) return;
   msg("Leyendo " + file.name + "…");
   Papa.parse(file, {
-    header:true, skipEmptyLines:true, transformHeader:h => h.replace(/^\uFEFF/, "").trim(),
+    header:true, skipEmptyLines:true, transformHeader:h => h.replace(/^﻿/, "").trim(),
     complete: res => {
       if (!res.data.length || !("CODI_BARRI" in res.data[0])) { msg("El archivo no tiene la columna CODI_BARRI. ¿Es el CSV correcto?"); return; }
       if (!geo) { msg("Esperando el mapa de barrios… vuelve a seleccionar el archivo en unos segundos."); return; }
@@ -167,75 +147,42 @@ function prepare(data){
   state.dist = "ALL";
 }
 
-// 4. Mapa coroplético (MapLibre GL JS + mapa base gratuito de OpenFreeMap, sin API key)
-const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
-let mapReady = false;
+// 4. Mapa coroplético (Leaflet)
 function color(v, m){
   if (!v) return "#ffffff";
   const br = METRICS[m].breaks; let i = 0;
   while (i < br.length && v >= br[i]) i++;
   return RAMP[Math.min(i, RAMP.length - 1)];
 }
-function bboxOf(features){
-  let b = [180, 90, -180, -90];
-  const walk = c => { if (typeof c[0] === "number"){ b = [Math.min(b[0],c[0]), Math.min(b[1],c[1]), Math.max(b[2],c[0]), Math.max(b[3],c[1])]; } else c.forEach(walk); };
-  features.forEach(f => walk(f.geometry.coordinates));
-  return [[b[0], b[1]], [b[2], b[3]]];
+function style(f){
+  const b = barris[pad2(f.properties.BARRI)] || {n:0,p:0,dens:0,dist:""};
+  const dim = state.dist !== "ALL" && b.dist !== state.dist;
+  return {fillColor: color(b[state.metric], state.metric), fillOpacity: dim ? .15 : .85, color:"#fff", weight:1};
 }
 function buildMap(){
-  map = new maplibregl.Map({container:"map", style:STYLE_URL, center:[2.16, 41.395], zoom:11.2});
-  map.addControl(new maplibregl.NavigationControl({showCompass:false}), "top-left");
-  map.on("load", () => {
-    map.addSource("barris", {type:"geojson", data:geo});
-    map.addLayer({id:"barris-fill", type:"fill", source:"barris",
-      paint:{"fill-color":["coalesce", ["get","color"], "#ffffff"], "fill-opacity":["coalesce", ["get","op"], .85]}});
-    map.addLayer({id:"barris-line", type:"line", source:"barris", paint:{"line-color":"#ffffff", "line-width":1}});
-    map.addLayer({id:"barris-hover", type:"line", source:"barris", paint:{"line-color":"#231f1a", "line-width":2.5}, filter:["==", ["get","code"], ""]});
-    map.addSource("pts", {type:"geojson", data:{type:"FeatureCollection", features:[]}});
-    map.addLayer({id:"pts", type:"circle", source:"pts", layout:{visibility:"none"},
-      paint:{"circle-radius":2.6, "circle-color":"#ffffff", "circle-stroke-color":"#231f1a", "circle-stroke-width":.7}});
+  map = L.map("map").setView([41.395, 2.16], 12);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    {attribution:"© OpenStreetMap © CARTO", maxZoom:18}).addTo(map);
+  geoLayer = L.geoJSON(geo, {style, onEachFeature:(f, layer) => layer.on({
+    mouseover: e => { e.target.setStyle({weight:2.5, color:"#231f1a"}); e.target.bringToFront(); info.update(barris[pad2(f.properties.BARRI)]); },
+    mouseout:  e => { geoLayer.resetStyle(e.target); info.update(); },
+    click:     e => map.fitBounds(e.target.getBounds(), {maxZoom:15})
+  })}).addTo(map);
+  map.fitBounds(geoLayer.getBounds());
 
-    map.on("mousemove", "barris-fill", e => {
-      const code = e.features[0].properties.code;
-      map.setFilter("barris-hover", ["==", ["get","code"], code]);
-      map.getCanvas().style.cursor = "pointer";
-      const b = barris[code];
-      document.getElementById("info").innerHTML = b
-        ? `<b>${b.name}</b><br>Viviendas: <b>${fmt(b.n)}</b><br>Plazas: <b>${fmt(b.p)}</b><br>Viviendas/km²: <b>${fmt1(b.dens)}</b>`
-        : "Pasa el ratón por un barrio";
-    });
-    map.on("mouseleave", "barris-fill", () => {
-      map.setFilter("barris-hover", ["==", ["get","code"], ""]);
-      map.getCanvas().style.cursor = "";
-      document.getElementById("info").textContent = "Pasa el ratón por un barrio";
-    });
-    map.on("click", "barris-fill", e => {
-      const f = geo.features.find(g => pad2(g.properties.BARRI) === e.features[0].properties.code);
-      if (f) map.fitBounds(bboxOf([f]), {padding:40, maxZoom:15});
-    });
-    map.on("click", "pts", e => {
-      const p = e.features[0].properties;
-      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`${p.barri}: ${p.places} plazas`).addTo(map);
-    });
-    mapReady = true;
-    if (rows.length) update();
-  });
-}
-function updateMap(sel){
-  if (!mapReady) return;
-  const m = state.metric;
-  geo.features.forEach(f => {
-    const code = pad2(f.properties.BARRI), b = barris[code] || {n:0, p:0, dens:0, dist:""};
-    f.properties.code = code;
-    f.properties.color = color(b[m], m);
-    f.properties.op = (state.dist === "ALL" || b.dist === state.dist) ? .85 : .15;
-  });
-  map.getSource("barris").setData(geo);
-  const fs = geo.features.filter(f => state.dist === "ALL" || pad2(f.properties.DISTRICTE) === state.dist);
-  map.fitBounds(bboxOf(fs), {padding:30, maxZoom:15});
-  map.getSource("pts").setData({type:"FeatureCollection", features: state.points ? sel.filter(r => isFinite(r.lat) && isFinite(r.lon))
-    .map(r => ({type:"Feature", geometry:{type:"Point", coordinates:[r.lon, r.lat]}, properties:{barri:r.barriNom, places:r.places}})) : []});
-  map.setLayoutProperty("pts", "visibility", state.points ? "visible" : "none");
+  info = L.control({position:"topright"});
+  info.onAdd = function(){ this._div = L.DomUtil.create("div", "info"); this.update(); return this._div; };
+  info.update = function(b){
+    this._div.innerHTML = b && b.name
+      ? `<b>${b.name}</b><br>Viviendas: <b>${fmt(b.n || 0)}</b><br>Plazas: <b>${fmt(b.p || 0)}</b><br>Viviendas/km²: <b>${fmt1(b.dens || 0)}</b>`
+      : "Pasa el ratón por un barrio";
+  };
+  info.addTo(map);
+
+  const legend = L.control({position:"bottomright"});
+  legend.onAdd = () => { const d = L.DomUtil.create("div", "legend"); d.id = "legend"; return d; };
+  legend.addTo(map);
+  pointLayer = L.layerGroup();
 }
 function updateLegend(){
   const m = METRICS[state.metric], br = m.breaks;
@@ -270,8 +217,19 @@ function update(){
   document.getElementById("kA").textContent = N ? fmt1(P / N) : "–";
   document.getElementById("kT").textContent = N ? Math.round(100 * top5 / N) + " %" : "–";
 
-  updateLegend(); updateMap(sel);
+  geoLayer.setStyle(style); updateLegend();
   document.getElementById("mapTitle").textContent = M.label + " por barrio";
+  const layers = geoLayer.getLayers().filter(l => state.dist === "ALL" || pad2(l.feature.properties.DISTRICTE) === state.dist);
+  map.fitBounds(L.featureGroup(layers).getBounds(), {maxZoom:15});
+
+  pointLayer.clearLayers();
+  if (state.points){
+    const canvas = L.canvas();
+    sel.forEach(r => { if (isFinite(r.lat) && isFinite(r.lon))
+      L.circleMarker([r.lat, r.lon], {renderer:canvas, radius:2.4, weight:.6, color:"#231f1a", fillColor:"#fff", fillOpacity:.9})
+        .bindTooltip(`${r.barriNom}: ${r.places} plazas`).addTo(pointLayer); });
+    pointLayer.addTo(map);
+  } else map.removeLayer(pointLayer);
 
   const top = [...bs].sort((a, b) => b[m] - a[m]).slice(0, 10);
   chTop.data.labels = top.map(b => b.name.length > 26 ? b.name.slice(0, 25) + "…" : b.name);
